@@ -1,0 +1,25 @@
+services:
+  backend:
+    build: ./backend
+    container_name: portfolio-backend
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE: /app/data/portfolio.db
+      UPLOAD_FOLDER: /app/uploads
+      JWT_SECRET_KEY: change-this-secret-before-deployment
+    volumes:
+      - portfolio_data:/app/data
+      - portfolio_uploads:/app/uploads
+
+  frontend:
+    build: ./frontend
+    container_name: portfolio-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  portfolio_data:
+  portfolio_uploads:

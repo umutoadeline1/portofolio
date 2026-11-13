@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Portfolio Management System</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+            color: #222;
+        }
+
+        header {
+            background: #17365d;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        main {
+            max-width: 900px;
+            margin: 25px auto;
+            padding: 20px;
+        }
+
+        .panel {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px #ddd;
+        }
+
+        input, textarea, select, button {
+            width: 100%;
+            padding: 11px;
+            margin: 8px 0;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: #17365d;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background: #24558c;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .item {
+            border-bottom: 1px solid #ddd;
+            padding: 12px 0;
+        }
+
+        #message {
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>E-Portfolio Management System</h1>
+    <p>Manage academic portfolios and evaluate learning modules</p>
+</header>
+
+<main>
+
+    <p id="message"></p>
+
+    <section id="authSection" class="panel">
+        <h2>Student Registration</h2>
+
+        <input id="registerName" placeholder="Full name">
+        <input id="registerEmail" type="email" placeholder="Email">
+        <input id="registerPassword" type="password" placeholder="Password">
+
+        <button onclick="register()">Register</button>
+
+        <hr>
+
+        <h2>Login</h2>
+
+        <input id="loginEmail" type="email" placeholder="Email">
+        <input id="loginPassword" type="password" placeholder="Password">
+
+        <button onclick="login()">Login</button>
+    </section>
+
+    <section id="dashboard" class="hidden">
+
+        <div class="panel">
+            <h2 id="welcome"></h2>
+            <button onclick="logout()">Logout</button>
+        </div>
+
+        <section id="studentSection">
+
+            <div class="panel">
+                <h2>Upload Portfolio</h2>
+
+                <input id="portfolioTitle" placeholder="Portfolio title">
+
+                <textarea id="portfolioDescription"
+                    placeholder="Description"></textarea>
+
+                <input id="portfolioFile" type="file">
+
+                <button onclick="uploadPortfolio()">Upload Portfolio</button>
+            </div>
+
+            <div class="panel">
+                <h2>Evaluate Module</h2>
+
+                <input id="moduleName" placeholder="Module name">
+
+                <select id="rating">
+                    <option value="5">5 - Excellent</option>
+                    <option value="4">4 - Very Good</option>
+                    <option value="3">3 - Good</option>
+                    <option value="2">2 - Fair</option>
+                    <option value="1">1 - Poor</option>
+                </select>
+
+                <textarea id="comments"
+                    placeholder="Your comments about this module"></textarea>
+
+                <button onclick="submitEvaluation()">Submit Evaluation</button>
+            </div>
+
+        </section>
+
+        <section id="lecturerSection" class="hidden">
+
+            <div class="panel">
+                <h2>Module Evaluations</h2>
+                <div id="evaluations"></div>
+            </div>
+
+        </section>
+
+        <div class="panel">
+            <h2>Portfolios</h2>
+            <div id="portfolios"></div>
+        </div>
+
+        <div class="panel">
+            <h2>Portfolio Reviews</h2>
+            <div id="reviews"></div>
+        </div>
+
+    </section>
+
+</main>
+
+<script>
+    const API = "/api";
+
+    let token = localStorage.getItem("token");
+    let currentUser = JSON.parse(localStorage.getItem("user") || "null");
+
+    function showMessage(message) {
+        document.getElementById("message").textContent = message;
+    }
+
+    async function apiRequest(path, options = {}) {
+        options.headers = options.headers || {};
+
+        if (token) {
+            options.headers.Authorization = `Bearer ${token}`;
+        }
+
+        const response = await fetch(API + path, options);
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || "Request failed");
+        }
+
+        return data;
+    }
+
+    async function register() {
+        try {
+            await apiRequest("/register", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    name: document.getElementById("registerName").value,
+                    email: document.getElementById("registerEmail").value,
+                    password: document.getElementById("registerPassword").value
+                })
+            });
+
+            showMessage("Registration successful. Please login.");
+        } catch (error) {
+            showMessage(error.message);
+        }
+    }
+
+    async function login() {
+        try {
+            const data = await apiRequest("/login", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    email: document.getElementById("loginEmail").value,
+                    password: document.getElementById("loginPassword").value
+                })
+            });
+
+            token = data.access_token;
+            currentUser = data.user;
+
+            localStorage.setItem("token", token);
+            localStorage.setItem("user", JSON.stringify(currentUser));
+
+            showDashboard();
+        } catch (error) {
+            showMessage(error.message);
+        }
+    }
+
+    function showDashboard() {
+        document.getElementById("authSection").classList.add("hidden");
+        document.getElementById("dashboard").classList.remove("hidden");
+
+        document.getElementById("welcome").textContent =
+            "Welcome, " + currentUser.name;
+
+        if (currentUser.role === "lecturer") {
+            document.getElementById("studentSection").classList.add("hidden");
+            document.getElementById("lecturerSection").classList.remove("hidden");
+            loadEvaluations();
+        } else {
+            document.getElementById("studentSection").classList.remove("hidden");
+            document.getElementById("lecturerSection").classList.add("hidden");
+        }
+
+        loadPortfolios();
+        loadReviews();
+    }
+
+    function logout() {
+        localStorage.clear();
+        token = null;
+        currentUser = null;
+        location.reload();
+    }
+
+    async function uploadPortfolio() {
+        try {
+            const file = document.getElementById("portfolioFile").files[0];
+
+            if (!file) {
+                showMessage("Please select a file.");
+                return;
+            }
+
+            const formData = new FormData();
+
+            formData.append("title",
+                document.getElementById("portfolioTitle").value);
+
+            formData.append("description",
+                document.getElementById("portfolioDescription").value);
+
+            formData.append("file", file);
+
+            await apiRequest("/portfolios", {
+                method: "POST",
+                body: formData
+            });
+
+            showMessage("Portfolio uploaded successfully.");
+            loadPortfolios();
+
+        } catch (error) {
+            showMessage(error.message);
+        }
+    }
+
+    async function loadPortfolios() {
+        try {
+            const portfolios = await apiRequest("/portfolios");
+            const container = document.getElementById("portfolios");
+
+            container.innerHTML = "";
+
+            portfolios.forEach(item => {
+                const div = document.createElement("div");
+                div.className = "item";
+
+                const title = document.createElement("strong");
+                title.textContent = item.title;
+
+                const description = document.createElement("p");
+                description.textContent = item.description || "";
+
+                const owner = document.createElement("p");
+                owner.textContent = item.student_name
+                    ? "Student: " + item.student_name
+                    : "";
+
+                const download = document.createElement("a");
+                download.textContent = "Download portfolio";
+                download.href = API + "/portfolios/" + item.id + "/file";
+                download.target = "_blank";
+                download.onclick = async function(event) {
+                    event.preventDefault();
+
+                    try {
+                        const response = await fetch(download.href, {
+                            headers: {
+                                Authorization: "Bearer " + token
+                            }
+                        });
+
+                        if (!response.ok) {
+                            throw new Error("Unable to download file");
+                        }
+
+                        const blob = await response.blob();
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+
+                        link.href = url;
+                        link.download = item.original_filename;
+                        link.click();
+
+                        URL.revokeObjectURL(url);
+                    } catch (error) {
+                        showMessage(error.message);
+                    }
+                };
+
+                div.append(title, description, owner, download);
+
+                if (currentUser.role === "lecturer") {
+                    const feedback = document.createElement("textarea");
+                    feedback.placeholder = "Write feedback";
+
+                    const grade = document.createElement("input");
+                    grade.placeholder = "Grade";
+
+                    const button = document.createElement("button");
+                    button.textContent = "Submit Review";
+
+                    button.onclick = () =>
+                        submitReview(item.id, feedback.value, grade.value);
+
+                    div.append(feedback, grade, button);
+                }
+
+                container.appendChild(div);
+            });
+
+        } catch (error) {
+            showMessage(error.message);
+        }
+    }
+
+    async function submitReview(id, feedback, grade) {
+        try {
+            await apiRequest(`/portfolios/${id}/review`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({feedback, grade})
+            });
+
+            showMessage("Review submitted.");
+            loadReviews();
+
+        } catch (error) {
+            showMessage(error.message);
+        }
+    }
+
+    async function loadReviews() {
+        try {
+            const reviews = await apiRequest("/reviews");
+            const container = document.getElementById("reviews");
+
+            container.innerHTML = "";
+
+            reviews.forEach(review => {
+                const div = document.createElement("div");
+                div.className = "item";
+
+                const title = document.createElement("strong");
+                title.textContent = review.title || "Portfolio review";
+
+                const feedback = document.createElement("p");
+                feedback.textContent = review.feedback;
+
+                const grade = document.createElement("p");
+                grade.textContent = "Grade: " + (review.grade || "Not provided");
+
+                div.append(title, feedback, grade);
+                container.appendChild(div);
+            });
+
+        } catch (error) {
+            showMessage(error.message);
+        }
+    }
+
+    async function submitEvaluation() {
+        try {
+            await apiRequest("/evaluations", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    module_name: document.getElementById("moduleName").value,
+                    rating: document.getElementById("rating").value,
+                    comments: document.getElementById("comments").value
+                })
+            });
+
+            showMessage("Module evaluation submitted.");
+
+        } catch (error) {
+            showMessage(error.message);
+        }
+    }
+
+    async function loadEvaluations() {
+        try {
+            const evaluations = await apiRequest("/evaluations");
+            const container = document.getElementById("evaluations");
+
+            container.innerHTML = "";
+
+            evaluations.forEach(item => {
+                const div = document.createElement("div");
+                div.className = "item";
+
+                const module = document.createElement("strong");
+                module.textContent = item.module_name;
+
+                const student = document.createElement("p");
+                student.textContent = "Student: " + item.student_name;
+
+                const rating = document.createElement("p");
+                rating.textContent = "Rating: " + item.rating + "/5";
+
+                const comments = document.createElement("p");
+                comments.textContent = item.comments || "";
+
+                div.append(module, student, rating, comments);
+                container.appendChild(div);
+            });
+
+        } catch (error) {
+            showMessage(error.message);
+        }
+    }
+
+    if (token && currentUser) {
+        showDashboard();
+    }
+</script>
+
+</body>
+</html>
