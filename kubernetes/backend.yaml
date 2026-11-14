@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: portfolio-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+          env:
+            - name: DATABASE
+              value: /app/data/portfolio.db
+            - name: UPLOAD_FOLDER
+              value: /app/uploads
+            - name: JWT_SECRET_KEY
+              value: "replace-with-a-strong-secret"
+          volumeMounts:
+            - name: data-volume
+              mountPath: /app/data
+            - name: uploads-volume
+              mountPath: /app/uploads
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: data-volume
+          persistentVolumeClaim:
+            claimName: portfolio-data
+        - name: uploads-volume
+          persistentVolumeClaim:
+            claimName: portfolio-uploads
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+  type: ClusterIP
