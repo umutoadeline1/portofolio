@@ -72,7 +72,7 @@ pipeline {
                             --name portfolio-frontend \
                             --network "$DOCKER_NETWORK" \
                             --restart unless-stopped \
-                            --publish 8080:80 \
+                            --publish 8083:80 \
                             "$FRONTEND_IMAGE"
                     '''
                 }
