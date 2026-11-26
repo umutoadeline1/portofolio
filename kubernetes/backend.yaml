@@ -24,7 +24,10 @@ spec:
             - name: UPLOAD_FOLDER
               value: /app/uploads
             - name: JWT_SECRET_KEY
-              value: "replace-with-a-strong-secret"
+              valueFrom:
+                secretKeyRef:
+                  name: portfolio-app-secrets
+                  key: jwt-secret
           volumeMounts:
             - name: data-volume
               mountPath: /app/data
